@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.4",
-    "@next/swc-win32-x64-msvc": "^16.3.4",
     "axios": "^1.6.8",
     "clsx": "^2.1.0",
     "framer-motion": "^11.1.7",
