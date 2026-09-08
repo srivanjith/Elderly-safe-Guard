@@ -90,7 +90,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login(res.data.token, res.data.user);
       }
     } catch (err: any) {
-      alert(`Demo login failed: ${err.response?.data?.message || err.message}`);
+      if (!err.response || err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
+        alert('⚠️ Demo Login Failed: Backend server on http://localhost:5000 is offline. Please start the backend service using "npm run dev" in the root directory.');
+      } else {
+        alert(`Demo login failed: ${err.response?.data?.message || err.message}`);
+      }
     } finally {
       setLoading(false);
     }

@@ -34,8 +34,8 @@ export default function TransactionsPage() {
   }, [filterRisk, filterStatus]);
 
   const filteredList = transactions.filter(t => 
-    t.recipientName.toLowerCase().includes(search.toLowerCase()) ||
-    t.recipientId.toLowerCase().includes(search.toLowerCase())
+    (t.recipientName || '').toLowerCase().includes(search.toLowerCase()) ||
+    (t.recipientId || '').toLowerCase().includes(search.toLowerCase())
   );
 
   return (

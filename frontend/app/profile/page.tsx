@@ -12,6 +12,13 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState('');
 
+  React.useEffect(() => {
+    if (user) {
+      if (user.name) setName(user.name);
+      if (user.phone) setPhone(user.phone);
+    }
+  }, [user]);
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);

@@ -31,7 +31,7 @@ class MLFraudDetector:
         X_train = np.vstack([normal_data, anomaly_data])
         X_train = np.clip(X_train, 0, None)
         
-        self.iso_forest = IsolationForest(contamination=0.1, random_state=42)
+        self.iso_forest = IsolationForest(contamination=0.109, n_estimators=200, random_state=42)
         self.iso_forest.fit(X_train)
         
         joblib.dump(self.iso_forest, ISO_MODEL_PATH)

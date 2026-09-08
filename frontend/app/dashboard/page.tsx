@@ -100,9 +100,9 @@ export default function DashboardPage() {
   const suspiciousBlockedCount = displayTransactions.filter(t => t.riskLevel === 'HIGH' || t.status === 'CANCELLED' || t.status === 'BLOCKED').length || 3;
 
   const filteredTransactions = displayTransactions.filter(tx => 
-    tx.recipientName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    tx.recipientId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    tx.status?.toLowerCase().includes(searchQuery.toLowerCase())
+    (tx.recipientName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (tx.recipientId || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (tx.status || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (

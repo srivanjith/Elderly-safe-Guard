@@ -120,7 +120,11 @@ export default function SendMoneyPage() {
         }
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Payment simulation failed.');
+      if (!err.response || err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
+        setError('Backend server is offline (http://localhost:5000). Please run "npm run dev" from the root folder.');
+      } else {
+        setError(err.response?.data?.message || 'Payment simulation failed.');
+      }
     } finally {
       setSubmitting(false);
     }

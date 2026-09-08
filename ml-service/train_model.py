@@ -68,7 +68,7 @@ def main():
     X = df[feature_cols].values
 
     print("[Dataset Script] Fitting Isolation Forest model on dataset...")
-    iso_model = IsolationForest(contamination=0.09, random_state=42)
+    iso_model = IsolationForest(contamination=0.109, n_estimators=200, random_state=42)
     iso_model.fit(X)
 
     joblib.dump(iso_model, model_path)

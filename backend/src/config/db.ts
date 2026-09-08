@@ -1,6 +1,10 @@
 import mongoose from 'mongoose';
 import dns from 'dns';
 
+let dbConnected = false;
+
+export const isDbConnected = (): boolean => dbConnected;
+
 export const connectDB = async (): Promise<void> => {
   // Fix Windows DNS resolution issue for MongoDB Atlas SRV URIs
   try {
@@ -10,34 +14,51 @@ export const connectDB = async (): Promise<void> => {
     // ignore
   }
 
-  const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/safepay_guardian';
+  const primaryUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/safepay_guardian';
+  const localUri = 'mongodb://127.0.0.1:27017/safepay_guardian';
   
+  mongoose.set('strictQuery', false);
+
+  // Event listeners
+  mongoose.connection.on('error', (err) => {
+    console.error(`[Database] MongoDB runtime error:`, err);
+    dbConnected = false;
+  });
+
+  mongoose.connection.on('disconnected', () => {
+    console.warn(`[Database] MongoDB disconnected.`);
+    dbConnected = false;
+  });
+
+  mongoose.connection.on('connected', () => {
+    dbConnected = true;
+  });
+
   try {
-    mongoose.set('strictQuery', false);
-    
-    console.log(`[Database] Connecting to MongoDB...`);
-    const conn = await mongoose.connect(uri);
+    console.log(`[Database] Connecting to MongoDB (${primaryUri.split('@').pop()})...`);
+    const conn = await mongoose.connect(primaryUri, { serverSelectionTimeoutMS: 5000 });
+    dbConnected = true;
     
     console.log(`\n==================================================`);
     console.log(` ✅ MONGO DB CONNECTED SUCCESSFULLY!`);
     console.log(` Host: ${conn.connection.host}`);
     console.log(` Database: ${conn.connection.name}`);
     console.log(`==================================================\n`);
-
-    // Event listeners
-    mongoose.connection.on('error', (err) => {
-      console.error(`[Database] MongoDB runtime error:`, err);
-    });
-
-    mongoose.connection.on('disconnected', () => {
-      console.warn(`[Database] MongoDB disconnected. Attempting to reconnect...`);
-    });
-
+    return;
   } catch (error: any) {
-    console.error(`\n❌ [Database] MongoDB Connection Failed:`, error.message);
-    console.warn(`📌 Verification Checklist:`);
-    console.warn(` 1. Ensure IP address 0.0.0.0/0 (Allow Access from Anywhere) is added under Network Access in MongoDB Atlas.`);
-    console.warn(` 2. Ensure your database username and password in backend/.env are correct.`);
-    console.warn(` 3. If running locally, start MongoDB service on port 27017.\n`);
+    console.warn(`\n⚠️ [Database] Primary MongoDB connection failed (${error.message}). Trying local fallback...`);
+  }
+
+  // Attempt local connection fallback
+  try {
+    const localConn = await mongoose.connect(localUri, { serverSelectionTimeoutMS: 3000 });
+    dbConnected = true;
+    console.log(` ✅ MONGO DB CONNECTED (Local Fallback: ${localConn.connection.host})`);
+    return;
+  } catch (localErr: any) {
+    dbConnected = false;
+    console.error(`\n❌ [Database] MongoDB is offline or unreachable.`);
+    console.warn(`⚡ [Fallback Active] Server will run with In-Memory Demo Auth fallback.`);
+    console.warn(`   Users can still log in using standard demo credentials (elderly@safepay.demo / Demo123!).\n`);
   }
 };

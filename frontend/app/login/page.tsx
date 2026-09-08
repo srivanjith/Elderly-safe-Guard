@@ -24,7 +24,11 @@ export default function LoginPage() {
         login(res.data.token, res.data.user);
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Login failed. Please check credentials.');
+      if (!err.response || err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
+        setError('Backend server is offline (http://localhost:5000). Please start the backend service by running "npm run dev" in the terminal.');
+      } else {
+        setError(err.response?.data?.message || 'Login failed. Please check credentials.');
+      }
     } finally {
       setLoading(false);
     }
@@ -43,6 +47,7 @@ export default function LoginPage() {
           <h1 className="text-3xl font-black text-slate-900">Log In to SafePay</h1>
           <p className="text-sm font-medium text-slate-600 mt-2">AI-Powered Scam Protection Platform</p>
         </div>
+
 
         {/* 1-Click Demo Login Box */}
         <div className="mb-6 p-4 rounded-3xl bg-white border border-slate-200/80 shadow-md text-center">
