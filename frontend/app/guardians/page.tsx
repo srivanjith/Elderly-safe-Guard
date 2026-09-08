@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Users, Plus, Trash2, ShieldCheck, Mail, UserPlus, HeartHandshake, CheckCircle } from 'lucide-react';
+import { Users, Plus, ShieldCheck, Mail, UserPlus, HeartHandshake, CheckCircle } from 'lucide-react';
 import api from '../../lib/api';
 
 export default function GuardiansPage() {
@@ -138,14 +138,6 @@ export default function GuardiansPage() {
                     <p className="text-xs text-slate-500 mt-0.5">{g.guardianUser?.phone || 'No phone'}</p>
                   </div>
                 </div>
-
-                <button
-                  onClick={() => handleRemove(g.id)}
-                  className="p-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition-colors"
-                  title="Remove Guardian"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
               </div>
             ))
           )}
