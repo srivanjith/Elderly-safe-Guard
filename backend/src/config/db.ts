@@ -6,7 +6,7 @@ let dbConnected = false;
 export const isDbConnected = (): boolean => dbConnected;
 
 export const connectDB = async (): Promise<void> => {
-  // Fix Windows DNS resolution issue for MongoDB Atlas SRV URIs
+  // Fix DNS resolution for MongoDB Atlas SRV URIs
   try {
     dns.setDefaultResultOrder('ipv4first');
     dns.setServers(['8.8.8.8', '1.1.1.1']);
@@ -14,7 +14,13 @@ export const connectDB = async (): Promise<void> => {
     // ignore
   }
 
-  const primaryUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/safepay_guardian';
+  const mongodbUri = process.env.MONGODB_URI;
+
+  if (!mongodbUri && process.env.NODE_ENV === 'production') {
+    console.error('❌ MONGODB_URI environment variable is not configured in Vercel/Production!');
+  }
+
+  const primaryUri = mongodbUri || 'mongodb://localhost:27017/safepay_guardian';
   const localUri = 'mongodb://127.0.0.1:27017/safepay_guardian';
   
   mongoose.set('strictQuery', false);
@@ -35,7 +41,7 @@ export const connectDB = async (): Promise<void> => {
   });
 
   try {
-    console.log(`[Database] Connecting to MongoDB (${primaryUri.split('@').pop()})...`);
+    console.log(`[Database] Connecting to MongoDB (${primaryUri.includes('@') ? primaryUri.split('@').pop() : primaryUri})...`);
     const conn = await mongoose.connect(primaryUri, { serverSelectionTimeoutMS: 5000 });
     dbConnected = true;
     
@@ -46,10 +52,10 @@ export const connectDB = async (): Promise<void> => {
     console.log(`==================================================\n`);
     return;
   } catch (error: any) {
-    console.warn(`\n⚠️ [Database] Primary MongoDB connection failed (${error.message}). Trying local fallback...`);
+    console.warn(`\n⚠️ [Database] Primary MongoDB connection failed (${error.message}).`);
   }
 
-  // Attempt local connection fallback
+  // Attempt local connection fallback if not in production
   try {
     const localConn = await mongoose.connect(localUri, { serverSelectionTimeoutMS: 3000 });
     dbConnected = true;
@@ -58,7 +64,7 @@ export const connectDB = async (): Promise<void> => {
   } catch (localErr: any) {
     dbConnected = false;
     console.error(`\n❌ [Database] MongoDB is offline or unreachable.`);
-    console.warn(`⚡ [Fallback Active] Server will run with In-Memory Demo Auth fallback.`);
-    console.warn(`   Users can still log in using standard demo credentials (elderly@safepay.demo / Demo123!).\n`);
+    console.warn(`⚡ [Fallback Active] Server running with In-Memory Demo Auth fallback.`);
+    console.warn(`   Users can still log in using standard demo credentials.\n`);
   }
 };
