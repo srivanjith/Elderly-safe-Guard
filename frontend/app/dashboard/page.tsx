@@ -31,7 +31,24 @@ import {
 import api from '../../lib/api';
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
+
+  const handleTopup = async () => {
+    const amountStr = prompt('Enter amount to add to your wallet (₹):', '50000');
+    if (!amountStr) return;
+    const amt = parseFloat(amountStr);
+    if (!amt || amt <= 0) return;
+
+    try {
+      const res = await api.post('/users/topup', { amount: amt });
+      if (res.data.success) {
+        alert(res.data.message || `₹${amt.toLocaleString()} added to your wallet!`);
+        if (refreshUser) refreshUser();
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Top-up failed');
+    }
+  };
   const [transactions, setTransactions] = useState<any[]>([]);
   const [guardians, setGuardians] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -197,8 +214,15 @@ export default function DashboardPage() {
                   <ChevronRight className="w-4 h-4" />
                 </div>
               </div>
-              <div className="mt-4 pt-3 border-t border-teal-200/60 text-xs text-teal-700 font-semibold flex items-center gap-1">
-                ✓ Safe Demo Wallet
+              <div className="mt-4 pt-3 border-t border-teal-200/60 text-xs text-teal-700 font-semibold flex items-center justify-between">
+                <span>✓ Safe Demo Wallet</span>
+                <button
+                  type="button"
+                  onClick={handleTopup}
+                  className="px-2.5 py-1 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-bold text-[11px] shadow-sm transition-all"
+                >
+                  + Add Funds
+                </button>
               </div>
             </motion.div>
 

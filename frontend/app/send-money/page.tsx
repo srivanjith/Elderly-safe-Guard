@@ -190,9 +190,32 @@ export default function SendMoneyPage() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="block text-sm font-extrabold text-slate-700">Amount (₹)</label>
-                <span className="text-xs font-bold text-slate-500">
-                  Available Wallet: <strong className="text-emerald-700 font-black">₹{user?.walletBalance?.toLocaleString()}</strong>
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-500">
+                    Available Wallet: <strong className="text-emerald-700 font-black">₹{user?.walletBalance?.toLocaleString()}</strong>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const amtStr = prompt('Enter amount to add to wallet (₹):', '50000');
+                      if (!amtStr) return;
+                      const amt = parseFloat(amtStr);
+                      if (!amt || amt <= 0) return;
+                      try {
+                        const res = await api.post('/users/topup', { amount: amt });
+                        if (res.data.success) {
+                          alert(res.data.message || `₹${amt.toLocaleString()} added to your wallet!`);
+                          if (refreshUser) refreshUser();
+                        }
+                      } catch (err: any) {
+                        alert('Top up failed');
+                      }
+                    }}
+                    className="px-2 py-0.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] shadow-sm transition-all"
+                  >
+                    + Add Funds
+                  </button>
+                </div>
               </div>
               <div className="relative">
                 <span className="absolute left-4 top-4 text-2xl font-black text-blue-600">₹</span>
