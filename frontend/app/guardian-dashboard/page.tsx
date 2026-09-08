@@ -29,55 +29,63 @@ export default function GuardianDashboardPage() {
         api.get('/users/fund-requests/pending')
       ]);
 
-      if (pendingRes.data?.success) {
-        setPendingList(pendingRes.data.pending || []);
+      if (pendingRes.data?.success && pendingRes.data.pending?.length > 0) {
+        setPendingList(pendingRes.data.pending);
       }
-      if (historyRes.data?.success) {
-        setHistoryList(historyRes.data.transactions || []);
+      if (historyRes.data?.success && historyRes.data.transactions?.length > 0) {
+        setHistoryList(historyRes.data.transactions);
       }
-      if (fundRes.data?.success) {
-        setFundRequests(fundRes.data.fundRequests || []);
+      if (fundRes.data?.success && fundRes.data.fundRequests?.length > 0) {
+        setFundRequests(fundRes.data.fundRequests);
+        setLoading(false);
+        return;
       }
-      return;
     } catch (err) {
-      console.warn('[GuardianDashboard] Backend unreachable, loading demo requests...', err);
+      console.warn('[GuardianDashboard] Backend unreachable, using live shared cross-tab demo bus...', err);
     } finally {
       setLoading(false);
     }
 
-    // Default Mock Demo Data for Guardian Review
-    setFundRequests([
-      {
-        _id: 'fund_req_demo_1',
-        amount: 10000,
-        note: 'Monthly Medical Expenses & Medicines',
-        createdAt: new Date(Date.now() - 3600000).toISOString(),
-        requesterId: { name: 'Ramakrishna Sharma (Ward)' }
-      }
-    ]);
+    // Load from Shared Cross-Tab Demo Bus
+    let sharedFundReqs: any[] = [];
+    let sharedHolds: any[] = [];
 
-    setPendingList([
-      {
-        _id: 'tx_hold_demo_1',
-        amount: 50000,
-        recipientName: 'Unknown Wire Investment Scam',
-        recipientId: 'high_risk_scam@safepay',
-        riskScore: 88,
-        riskLevel: 'HIGH',
-        riskReasons: [
-          'High transfer amount above typical ₹25,000 threshold',
-          'Unrecognized new beneficiary account',
-          'New unrecognized device hardware fingerprint'
-        ],
-        senderId: { name: 'Ramakrishna Sharma (Ward)' },
-        createdAt: new Date(Date.now() - 1800000).toISOString()
-      }
-    ]);
+    try {
+      sharedFundReqs = JSON.parse(localStorage.getItem('safepay_shared_fund_requests') || '[]');
+      sharedHolds = JSON.parse(localStorage.getItem('safepay_shared_pending_holds') || '[]');
+    } catch {}
+
+    const defaultFundReq = {
+      _id: 'fund_req_demo_1',
+      amount: 10000,
+      note: 'Monthly Medical Expenses & Medicines',
+      createdAt: new Date(Date.now() - 3600000).toISOString(),
+      requesterId: { name: 'Grandma Rose (Elderly Ward)' }
+    };
+
+    const defaultHold = {
+      _id: 'tx_hold_demo_1',
+      amount: 50000,
+      recipientName: 'Unknown Wire Investment Scam',
+      recipientId: 'high_risk_scam@safepay',
+      riskScore: 88,
+      riskLevel: 'HIGH',
+      riskReasons: [
+        'High transfer amount above typical ₹25,000 threshold',
+        'Unrecognized new beneficiary account',
+        'New unrecognized device hardware fingerprint'
+      ],
+      senderId: { name: 'Grandma Rose (Elderly Ward)' },
+      createdAt: new Date(Date.now() - 1800000).toISOString()
+    };
+
+    setFundRequests(sharedFundReqs.length > 0 ? sharedFundReqs : [defaultFundReq]);
+    setPendingList(sharedHolds.length > 0 ? sharedHolds : [defaultHold]);
 
     setHistoryList([
       {
         _id: 'tx_hist_demo_1',
-        senderId: { name: 'Ramakrishna Sharma (Ward)' },
+        senderId: { name: 'Grandma Rose (Elderly Ward)' },
         recipientName: 'MedPlus Pharmacy',
         recipientId: 'medplus@safepay',
         amount: 3500,
@@ -99,7 +107,14 @@ export default function GuardianDashboardPage() {
         return;
       }
     } catch {
-      // Local fallback approval
+      // Local fallback approval & shared bus sync
+      try {
+        const shared = JSON.parse(localStorage.getItem('safepay_shared_fund_requests') || '[]');
+        const updated = shared.filter((r: any) => r._id !== reqId);
+        localStorage.setItem('safepay_shared_fund_requests', JSON.stringify(updated));
+        window.dispatchEvent(new Event('storage'));
+      } catch {}
+
       setFundRequests(prev => prev.filter(r => r._id !== reqId));
       alert(`✅ ₹${amount.toLocaleString()} allowance transferred to ${requesterName} successfully!`);
     } finally {
@@ -110,14 +125,23 @@ export default function GuardianDashboardPage() {
   const handleRejectFundRequest = async (reqId: string) => {
     try {
       await api.post(`/users/fund-requests/${reqId}/reject`);
-    } catch {
-      // Local fallback decline
-    }
+    } catch {}
+
+    try {
+      const shared = JSON.parse(localStorage.getItem('safepay_shared_fund_requests') || '[]');
+      const updated = shared.filter((r: any) => r._id !== reqId);
+      localStorage.setItem('safepay_shared_fund_requests', JSON.stringify(updated));
+      window.dispatchEvent(new Event('storage'));
+    } catch {}
+
     setFundRequests(prev => prev.filter(r => r._id !== reqId));
   };
 
   useEffect(() => {
     fetchPendingAndHistory();
+
+    const handleStorage = () => fetchPendingAndHistory();
+    window.addEventListener('storage', handleStorage);
 
     const socket = getSocket();
     const handleHighRisk = () => fetchPendingAndHistory();
@@ -130,6 +154,7 @@ export default function GuardianDashboardPage() {
     socket.on('fund:requested', handleFundRequested);
 
     return () => {
+      window.removeEventListener('storage', handleStorage);
       socket.off('transaction:high-risk', handleHighRisk);
       socket.off('transaction:approved', handleStatus);
       socket.off('transaction:blocked', handleStatus);

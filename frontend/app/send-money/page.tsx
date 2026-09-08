@@ -204,15 +204,28 @@ export default function SendMoneyPage() {
       const isHigh = score >= 60;
 
       if (isHigh) {
+        const holdTx = {
+          _id: `tx_demo_${Date.now()}`,
+          recipientName,
+          recipientId,
+          amount: amtNum,
+          riskScore: Math.min(score, 99),
+          riskLevel: 'HIGH',
+          riskReasons: riskAssessment?.reasons || ['High anomaly scoring detected', 'Simulated hardware anomaly'],
+          senderId: { name: user?.name || 'Grandma Rose (Elderly Ward)' },
+          createdAt: new Date().toISOString()
+        };
+
+        try {
+          const existingHolds = JSON.parse(localStorage.getItem('safepay_shared_pending_holds') || '[]');
+          existingHolds.unshift(holdTx);
+          localStorage.setItem('safepay_shared_pending_holds', JSON.stringify(existingHolds));
+          window.dispatchEvent(new Event('storage'));
+        } catch {}
+
         setHoldModal({
           open: true,
-          transaction: {
-            _id: `tx_demo_${Date.now()}`,
-            recipientName,
-            amount: amtNum,
-            riskScore: Math.min(score, 99),
-            riskReasons: riskAssessment?.reasons || ['High anomaly scoring detected', 'Simulated hardware anomaly']
-          }
+          transaction: holdTx
         });
       } else {
         setSuccessModal({
@@ -444,13 +457,27 @@ export default function SendMoneyPage() {
                     const noteStr = prompt('Enter Purpose Note:', 'Monthly Expenses') || 'Allowance';
                     try {
                       const res = await api.post('/users/request-funds', { amount: amt, note: noteStr });
-                      if (res.data.success) {
+                      if (res.data?.success) {
                         alert(res.data.message || `📩 Fund request for ₹${amt.toLocaleString()} sent to Guardian!`);
                         if (refreshUser) refreshUser();
+                        return;
                       }
-                    } catch {
-                      alert('Request failed');
-                    }
+                    } catch {}
+
+                    // Shared local cross-tab fallback sync
+                    try {
+                      const existing = JSON.parse(localStorage.getItem('safepay_shared_fund_requests') || '[]');
+                      existing.unshift({
+                        _id: `fund_req_${Date.now()}`,
+                        amount: amt,
+                        note: noteStr,
+                        createdAt: new Date().toISOString(),
+                        requesterId: { name: user?.name || 'Grandma Rose (Elderly Ward)' }
+                      });
+                      localStorage.setItem('safepay_shared_fund_requests', JSON.stringify(existing));
+                      window.dispatchEvent(new Event('storage'));
+                    } catch {}
+                    alert(`📩 Allowance request for ₹${amt.toLocaleString()} sent to your Guardian (Arun Sharma)!`);
                   }}
                   className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px]"
                 >

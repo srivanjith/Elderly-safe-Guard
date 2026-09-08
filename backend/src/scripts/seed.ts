@@ -36,11 +36,11 @@ export const seedDatabase = async () => {
 
     // Create Demo Users
     const elderlyUser = await User.create({
-      name: 'Ramakrishna Sharma',
+      name: 'Grandma Rose',
       email: 'elderly@safepay.demo',
       password: defaultPassword,
       role: 'ELDERLY_USER',
-      walletBalance: 150000,
+      walletBalance: 1051033,
       phone: '+91 98765 43210',
       avatar: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=150&auto=format&fit=crop&q=80'
     });
