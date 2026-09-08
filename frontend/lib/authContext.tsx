@@ -95,6 +95,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const demoLogin = async (email: string) => {
+    // 1-Click Demo Login Handler with Instant Client-Side Fallback
     setLoading(true);
     try {
       const res = await api.post('/auth/login', { email, password: 'Demo123!' });
