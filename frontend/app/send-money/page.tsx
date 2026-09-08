@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ShieldAlert, Send, ArrowLeft, CheckCircle, AlertTriangle, Clock, RefreshCw, Smartphone } from 'lucide-react';
+import { Sparkles, ArrowLeft, ShieldAlert, Send, CheckCircle, AlertTriangle, Clock, RefreshCw, Smartphone, Check, Plus } from 'lucide-react';
 import api from '../../lib/api';
 import { useAuth } from '../../lib/authContext';
 import { getSocket } from '../../lib/socket';
@@ -10,10 +10,13 @@ export default function SendMoneyPage() {
   const { user, refreshUser } = useAuth();
   const router = useRouter();
 
-  const [recipientName, setRecipientName] = useState('');
-  const [recipientId, setRecipientId] = useState('');
-  const [amount, setAmount] = useState<string>('');
+  const [recipientName, setRecipientName] = useState('MedPlus Pharmacy');
+  const [recipientId, setRecipientId] = useState('medplus@safepay');
+  const [amount, setAmount] = useState<string>('5000');
   const [note, setNote] = useState('');
+  const [beneficiaryStatus, setBeneficiaryStatus] = useState<'KNOWN' | 'NEW'>('KNOWN');
+  const [transactionType, setTransactionType] = useState('Bill payment');
+  const [transactionTime, setTransactionTime] = useState('10:30 AM');
   const [deviceChanged, setDeviceChanged] = useState(false);
 
   const [riskAssessment, setRiskAssessment] = useState<any>(null);
@@ -25,34 +28,57 @@ export default function SendMoneyPage() {
   const [holdModal, setHoldModal] = useState<{ open: boolean; transaction: any }>({ open: false, transaction: null });
   const [successModal, setSuccessModal] = useState<{ open: boolean; message: string }>({ open: false, message: '' });
 
+  // Update recipientId based on status toggle and name
+  useEffect(() => {
+    const handleSlug = recipientName ? recipientName.toLowerCase().replace(/[^a-z0-9]/g, '') : 'payee';
+    if (beneficiaryStatus === 'NEW') {
+      setRecipientId(`${handleSlug}_new_${Date.now().toString().slice(-4)}@safepay`);
+    } else {
+      setRecipientId(`${handleSlug}@safepay`);
+    }
+  }, [beneficiaryStatus, recipientName]);
+
   // Quick risk preview calculation as user fills form
+  const handleAnalyzeRisk = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setError('');
+    const amtNum = parseFloat(amount);
+
+    if (!recipientName || !amtNum || amtNum <= 0) {
+      setError('Please enter beneficiary name and a valid transaction amount.');
+      return;
+    }
+
+    setEvaluating(true);
+    try {
+      const res = await api.post('/transactions/123/analyze', {
+        amount: amtNum,
+        recipientId: recipientId || 'medplus@safepay',
+        deviceChanged: deviceChanged || beneficiaryStatus === 'NEW'
+      });
+      if (res.data.success) {
+        setRiskAssessment(res.data.assessment);
+      }
+    } catch (err: any) {
+      console.error(err);
+    } finally {
+      setEvaluating(false);
+    }
+  };
+
   useEffect(() => {
     const amtNum = parseFloat(amount);
-    if (!amtNum || amtNum <= 0 || !recipientId) {
+    if (!amtNum || amtNum <= 0 || !recipientName) {
       setRiskAssessment(null);
       return;
     }
 
-    const timer = setTimeout(async () => {
-      setEvaluating(true);
-      try {
-        const res = await api.post('/transactions/123/analyze', {
-          amount: amtNum,
-          recipientId,
-          deviceChanged
-        });
-        if (res.data.success) {
-          setRiskAssessment(res.data.assessment);
-        }
-      } catch {
-        // ignore
-      } finally {
-        setEvaluating(false);
-      }
+    const timer = setTimeout(() => {
+      handleAnalyzeRisk();
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [amount, recipientId, deviceChanged]);
+  }, [amount, recipientName, beneficiaryStatus, deviceChanged]);
 
   // Socket listener for guardian approval/blocking on held modal
   useEffect(() => {
@@ -106,8 +132,8 @@ export default function SendMoneyPage() {
         recipientName,
         recipientId,
         amount: amtNum,
-        note,
-        deviceChanged
+        note: note ? `[${transactionType}] ${note}` : `[${transactionType}] Payment`,
+        deviceChanged: deviceChanged || beneficiaryStatus === 'NEW'
       });
 
       if (res.data.success && res.data.transaction) {
@@ -130,29 +156,42 @@ export default function SendMoneyPage() {
     }
   };
 
-  
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#ebf3fe] via-[#f4f8ff] to-[#eaf1fc] text-slate-800 selection:bg-[#2563eb] selection:text-white pl-16 md:pl-24 py-8 font-sans">
-      <div className="max-w-3xl mx-auto px-4">
-        {/* Navigation Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <button
-            onClick={() => router.back()}
-            className="p-3 rounded-2xl bg-white border border-slate-200 shadow-sm text-slate-600 hover:text-slate-900 transition-all hover:scale-105"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
+    <div className="min-h-screen bg-[#f6f9fc] text-slate-800 selection:bg-[#2563eb] selection:text-white pl-16 md:pl-24 py-8 font-sans">
+      <div className="max-w-4xl mx-auto px-4 space-y-6">
+        
+        {/* Header Section */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-black text-slate-900">Simulate Payment Transfer</h1>
-            <p className="text-sm font-medium text-slate-600">SafePay Guardian AI Risk Interception</p>
+            <span className="text-[11px] font-bold font-mono tracking-wider text-slate-500 uppercase block mb-1">
+              (b) · TRANSACTION SAFETY CHECK
+            </span>
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+              Make a transaction
+            </h1>
+            <p className="text-slate-500 text-sm font-medium mt-1">
+              Every transfer is analyzed against your simulated 30-day behavior baseline before it can proceed.
+            </p>
           </div>
+
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="self-start sm:self-center px-4 py-2 rounded-full bg-white border border-slate-200/90 text-slate-700 font-bold text-xs shadow-sm hover:bg-slate-50 transition-all flex items-center gap-1.5 shrink-0"
+          >
+            <ArrowLeft className="w-4 h-4 text-slate-500" />
+            <span>Back to overview</span>
+          </button>
         </div>
 
-        {/* Main Payment Form Card */}
-        <div className="p-8 sm:p-10 rounded-3xl bg-white border border-slate-200/80 shadow-md space-y-6 relative overflow-hidden">
-          
+        {/* Main Card: Transaction Details */}
+        <div className="p-8 sm:p-10 rounded-3xl bg-white border border-slate-200/90 shadow-sm space-y-6">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">Transaction details</h2>
+            <p className="text-xs text-slate-500 font-medium mt-0.5">Use sample details to test different risk outcomes.</p>
+          </div>
+
           {error && (
-            <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-sm font-extrabold flex items-center gap-3">
+            <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold flex items-center gap-3">
               <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
               <span>{error}</span>
             </div>
@@ -160,181 +199,226 @@ export default function SendMoneyPage() {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             
-            {/* Recipient Name */}
-            <div>
-              <label className="block text-sm font-extrabold text-slate-700 mb-2">Recipient Name</label>
-              <input
-                type="text"
-                required
-                value={recipientName}
-                onChange={(e) => setRecipientName(e.target.value)}
-                placeholder="e.g. Ravi Kumar"
-                className="w-full p-4 bg-slate-50 border border-slate-300 rounded-2xl text-slate-900 font-bold text-lg focus:outline-none focus:border-blue-600 transition-all placeholder:text-slate-400"
-              />
-            </div>
-
-            {/* Recipient ID */}
-            <div>
-              <label className="block text-sm font-extrabold text-slate-700 mb-2">Recipient UPI Handle / ID</label>
-              <input
-                type="text"
-                required
-                value={recipientId}
-                onChange={(e) => setRecipientId(e.target.value)}
-                placeholder="e.g. ravi@safepay"
-                className="w-full p-4 bg-slate-50 border border-slate-300 rounded-2xl text-slate-900 font-bold text-lg focus:outline-none focus:border-blue-600 transition-all placeholder:text-slate-400"
-              />
-            </div>
-
-            {/* Transfer Amount */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-extrabold text-slate-700">Amount (₹)</label>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-500">
-                    Available Wallet: <strong className="text-emerald-700 font-black">₹{user?.walletBalance?.toLocaleString()}</strong>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const amtStr = prompt('Enter Allowance Amount to request from Guardian (₹):', '10000');
-                      if (!amtStr) return;
-                      const amt = parseFloat(amtStr);
-                      if (!amt || amt <= 0) return;
-                      const note = prompt('Enter Purpose / Note (Optional):', 'Monthly Expenses') || 'Allowance';
-                      try {
-                        const res = await api.post('/users/request-funds', { amount: amt, note });
-                        if (res.data.success) {
-                          alert(res.data.message || `📩 Fund request for ₹${amt.toLocaleString()} sent to Guardian!`);
-                          if (refreshUser) refreshUser();
-                        }
-                      } catch (err: any) {
-                        alert('Request failed');
-                      }
-                    }}
-                    className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] shadow-sm transition-all"
-                  >
-                    + Request Funds
-                  </button>
+            {/* Form Grid 2 Columns */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              
+              {/* Amount */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-2">Amount</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-3.5 text-base font-bold text-slate-500">₹</span>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="5000"
+                    className="w-full pl-9 pr-4 py-3 bg-[#f8fafc] border border-slate-200 rounded-2xl text-slate-900 font-bold text-base focus:outline-none focus:border-[#2a276e] transition-all placeholder:text-slate-400"
+                  />
                 </div>
+                <span className="text-[11px] font-medium text-slate-400 mt-1.5 block">
+                  Typical range: ₹1,000—₹25,000
+                </span>
               </div>
-              <div className="relative">
-                <span className="absolute left-4 top-4 text-2xl font-black text-blue-600">₹</span>
+
+              {/* Beneficiary Name */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-2">Beneficiary name</label>
                 <input
-                  type="number"
+                  type="text"
                   required
-                  min="1"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="50000"
-                  className="w-full pl-10 pr-4 py-4 bg-slate-50 border border-slate-300 rounded-2xl text-slate-900 font-black text-2xl focus:outline-none focus:border-blue-600 transition-all placeholder:text-slate-400"
+                  value={recipientName}
+                  onChange={(e) => setRecipientName(e.target.value)}
+                  placeholder="MedPlus Pharmacy"
+                  className="w-full px-4 py-3 bg-[#f8fafc] border border-slate-200 rounded-2xl text-slate-900 font-bold text-base focus:outline-none focus:border-[#2a276e] transition-all placeholder:text-slate-400"
                 />
               </div>
 
-              {/* Amount Quick Presets */}
-              <div className="flex items-center gap-2 mt-3">
-                <span className="text-xs font-bold text-slate-500 mr-1">Quick Select:</span>
-                {[500, 2000, 10000, 50000].map((preset) => (
+              {/* Beneficiary Status Toggle */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-2">Beneficiary status</label>
+                <div className="grid grid-cols-2 gap-3">
                   <button
-                    key={preset}
                     type="button"
-                    onClick={() => setAmount(preset.toString())}
-                    className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-700 border border-slate-200 font-extrabold text-xs transition-all"
-                  >
-                    ₹{preset.toLocaleString()}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Note Optional */}
-            <div>
-              <label className="block text-sm font-extrabold text-slate-700 mb-2">Payment Purpose (Optional)</label>
-              <input
-                type="text"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="e.g. House Rent / Grocery / Emergency"
-                className="w-full p-4 bg-slate-50 border border-slate-300 rounded-2xl text-slate-900 font-medium text-base focus:outline-none focus:border-blue-600 transition-all placeholder:text-slate-400"
-              />
-            </div>
-
-            {/* Device Change Simulation Checkbox */}
-            <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold">
-                  <Smartphone className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="block text-sm font-extrabold text-slate-900">Simulate New Device Transfer</span>
-                  <span className="text-xs text-slate-500 font-medium">Triggers device change anomaly flag in ML model</span>
-                </div>
-              </div>
-              <input
-                type="checkbox"
-                checked={deviceChanged}
-                onChange={(e) => setDeviceChanged(e.target.checked)}
-                className="w-6 h-6 accent-blue-600 rounded-lg cursor-pointer"
-              />
-            </div>
-
-            {/* Live AI Risk Assessment Meter */}
-            {riskAssessment && (
-              <div className={`p-5 rounded-2xl border transition-all ${
-                riskAssessment.riskLevel === 'HIGH'
-                  ? 'bg-rose-50 border-rose-200'
-                  : riskAssessment.riskLevel === 'MEDIUM'
-                  ? 'bg-amber-50 border-amber-200'
-                  : 'bg-emerald-50 border-emerald-200'
-              }`}>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-black uppercase tracking-wider text-slate-500">Live AI Risk Telemetry</span>
-                  <span className={`text-xs font-black ${
-                    riskAssessment.riskLevel === 'HIGH' ? 'text-rose-700' : riskAssessment.riskLevel === 'MEDIUM' ? 'text-amber-700' : 'text-emerald-700'
-                  }`}>
-                    {riskAssessment.riskLevel} RISK • SCORE {riskAssessment.riskScore}/100
-                  </span>
-                </div>
-
-                {/* Progress bar */}
-                <div className="w-full h-2.5 rounded-full bg-slate-200 overflow-hidden mb-3">
-                  <div
-                    className={`h-full transition-all duration-500 ${
-                      riskAssessment.riskLevel === 'HIGH' ? 'bg-rose-500' : riskAssessment.riskLevel === 'MEDIUM' ? 'bg-amber-500' : 'bg-emerald-500'
+                    onClick={() => setBeneficiaryStatus('KNOWN')}
+                    className={`py-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                      beneficiaryStatus === 'KNOWN'
+                        ? 'bg-[#2a276e] border-[#2a276e] text-white shadow-md'
+                        : 'bg-[#f8fafc] border-slate-200 text-slate-700 hover:bg-slate-100'
                     }`}
-                    style={{ width: `${riskAssessment.riskScore}%` }}
-                  />
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>Known</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setBeneficiaryStatus('NEW')}
+                    className={`py-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                      beneficiaryStatus === 'NEW'
+                        ? 'bg-[#2a276e] border-[#2a276e] text-white shadow-md'
+                        : 'bg-[#f8fafc] border-slate-200 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>New</span>
+                  </button>
                 </div>
-
-                <ul className="space-y-1">
-                  {riskAssessment.reasons?.map((r: string, idx: number) => (
-                    <li key={idx} className="text-xs text-slate-700 font-medium flex items-center gap-1.5">
-                      <span className="text-blue-600">•</span> {r}
-                    </li>
-                  ))}
-                </ul>
               </div>
-            )}
 
-            {/* Submit Action Button */}
+              {/* Transaction Type */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-2">Transaction type</label>
+                <select
+                  value={transactionType}
+                  onChange={(e) => setTransactionType(e.target.value)}
+                  className="w-full px-4 py-3 bg-[#f8fafc] border border-slate-200 rounded-2xl text-slate-900 font-bold text-sm focus:outline-none focus:border-[#2a276e] transition-all"
+                >
+                  <option value="Bill payment">Bill payment</option>
+                  <option value="P2P Transfer">P2P Transfer</option>
+                  <option value="Merchant Purchase">Merchant Purchase</option>
+                  <option value="Emergency Medical">Emergency Medical</option>
+                  <option value="High Risk Wire / Investment">High Risk Wire / Investment</option>
+                </select>
+              </div>
+
+              {/* Transaction Time */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-2">Transaction time</label>
+                <input
+                  type="text"
+                  value={transactionTime}
+                  onChange={(e) => setTransactionTime(e.target.value)}
+                  placeholder="10:30 AM"
+                  className="w-full px-4 py-3 bg-[#f8fafc] border border-slate-200 rounded-2xl text-slate-900 font-bold text-base focus:outline-none focus:border-[#2a276e] transition-all placeholder:text-slate-400"
+                />
+              </div>
+
+              {/* Optional Transaction Note */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-2">Optional transaction note</label>
+                <input
+                  type="text"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="What is this for?"
+                  className="w-full px-4 py-3 bg-[#f8fafc] border border-slate-200 rounded-2xl text-slate-900 font-medium text-sm focus:outline-none focus:border-[#2a276e] transition-all placeholder:text-slate-400"
+                />
+              </div>
+
+            </div>
+
+            {/* Simulated Device Toggle & Wallet Info */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-[#f8fafc] border border-slate-200">
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="deviceToggle"
+                  checked={deviceChanged}
+                  onChange={(e) => setDeviceChanged(e.target.checked)}
+                  className="w-5 h-5 accent-[#2a276e] rounded cursor-pointer"
+                />
+                <label htmlFor="deviceToggle" className="text-xs font-bold text-slate-700 cursor-pointer">
+                  Simulate New Unrecognized Device (Triggers ML anomaly flag)
+                </label>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs text-slate-500 font-bold">
+                <span>Wallet: <strong className="text-emerald-600 font-black">₹{user?.walletBalance?.toLocaleString()}</strong></span>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const amtStr = prompt('Enter Allowance Amount to request from Guardian (₹):', '10000');
+                    if (!amtStr) return;
+                    const amt = parseFloat(amtStr);
+                    if (!amt || amt <= 0) return;
+                    const noteStr = prompt('Enter Purpose Note:', 'Monthly Expenses') || 'Allowance';
+                    try {
+                      const res = await api.post('/users/request-funds', { amount: amt, note: noteStr });
+                      if (res.data.success) {
+                        alert(res.data.message || `📩 Fund request for ₹${amt.toLocaleString()} sent to Guardian!`);
+                        if (refreshUser) refreshUser();
+                      }
+                    } catch {
+                      alert('Request failed');
+                    }
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px]"
+                >
+                  + Request Funds
+                </button>
+              </div>
+            </div>
+
+            {/* Analyze & Confirm Action Button */}
             <button
               type="submit"
-              disabled={submitting}
-              className="w-full py-5 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white font-black text-lg shadow-lg shadow-blue-600/25 flex items-center justify-center gap-3 transition-all disabled:opacity-50 hover:scale-[1.02]"
+              disabled={submitting || evaluating}
+              className="w-full py-4 rounded-2xl bg-[#2a276e] hover:bg-[#201d58] text-white font-black text-base shadow-md flex items-center justify-center gap-2 transition-all hover:scale-[1.01]"
             >
               {submitting ? (
                 <>
-                  <RefreshCw className="w-6 h-6 animate-spin text-white" />
-                  <span>Evaluating Fraud Engine...</span>
+                  <RefreshCw className="w-5 h-5 animate-spin text-white" />
+                  <span>Processing Payment...</span>
                 </>
               ) : (
                 <>
-                  <Send className="w-6 h-6" />
-                  <span>CONFIRM DEMO PAYMENT</span>
+                  <Sparkles className="w-5 h-5 text-purple-300" />
+                  <span>Analyze & Confirm Transaction</span>
                 </>
               )}
             </button>
           </form>
+        </div>
+
+        {/* AI Risk Analysis Card */}
+        <div className="p-8 rounded-3xl bg-[#e8f7ff] border border-[#baeafe] shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-2xl font-black text-slate-900">AI risk analysis</h3>
+            <span className="px-3.5 py-1 rounded-full bg-white border border-sky-300 text-sky-700 font-mono text-xs font-extrabold flex items-center gap-1 shadow-sm">
+              <span className="animate-pulse text-sky-500">~</span> Simulated engine
+            </span>
+          </div>
+
+          <p className="text-xs text-slate-600 font-medium">
+            The AI recommends a safety response; it never makes an irreversible decision independently.
+          </p>
+
+          {/* Live Telemetry Data */}
+          {riskAssessment ? (
+            <div className="p-5 rounded-2xl bg-white border border-sky-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black uppercase text-slate-500">Live Machine Learning Output</span>
+                <span className={`text-xs font-black px-3 py-1 rounded-full border ${
+                  riskAssessment.riskLevel === 'HIGH' ? 'bg-rose-100 text-rose-700 border-rose-300' : riskAssessment.riskLevel === 'MEDIUM' ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-emerald-100 text-emerald-700 border-emerald-300'
+                }`}>
+                  {riskAssessment.riskLevel} RISK • SCORE {riskAssessment.riskScore}/100
+                </span>
+              </div>
+
+              <div className="w-full h-2.5 rounded-full bg-slate-100 overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-500 ${
+                    riskAssessment.riskLevel === 'HIGH' ? 'bg-rose-500' : riskAssessment.riskLevel === 'MEDIUM' ? 'bg-amber-500' : 'bg-emerald-500'
+                  }`}
+                  style={{ width: `${riskAssessment.riskScore}%` }}
+                />
+              </div>
+
+              <ul className="space-y-1 pt-1">
+                {riskAssessment.reasons?.map((r: string, idx: number) => (
+                  <li key={idx} className="text-xs text-slate-700 font-bold flex items-center gap-1.5">
+                    <span className="text-blue-600">✓</span> {r}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <div className="p-4 rounded-2xl bg-white/70 border border-sky-200 text-xs font-bold text-slate-500 text-center">
+              Fill in transaction details above to compute live behavioral risk scoring.
+            </div>
+          )}
         </div>
 
         {/* HIGH RISK HOLD MODAL */}
