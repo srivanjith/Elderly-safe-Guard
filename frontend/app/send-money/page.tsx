@@ -211,15 +211,21 @@ export default function SendMoneyPage() {
           amount: amtNum,
           riskScore: Math.min(score, 99),
           riskLevel: 'HIGH',
+          status: 'PENDING_GUARDIAN_APPROVAL',
           riskReasons: riskAssessment?.reasons || ['High anomaly scoring detected', 'Simulated hardware anomaly'],
           senderId: { name: user?.name || 'Grandma Rose (Elderly Ward)' },
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toLocaleString()
         };
 
         try {
           const existingHolds = JSON.parse(localStorage.getItem('safepay_shared_pending_holds') || '[]');
           existingHolds.unshift(holdTx);
           localStorage.setItem('safepay_shared_pending_holds', JSON.stringify(existingHolds));
+
+          const existingTx = JSON.parse(localStorage.getItem('safepay_shared_transactions') || '[]');
+          existingTx.unshift(holdTx);
+          localStorage.setItem('safepay_shared_transactions', JSON.stringify(existingTx));
+
           window.dispatchEvent(new Event('storage'));
         } catch {}
 
@@ -228,6 +234,31 @@ export default function SendMoneyPage() {
           transaction: holdTx
         });
       } else {
+        const completedTx = {
+          _id: `tx_demo_${Date.now()}`,
+          recipientName,
+          recipientId,
+          amount: amtNum,
+          riskScore: Math.min(score, 25),
+          riskLevel: 'LOW',
+          status: 'COMPLETED',
+          createdAt: new Date().toLocaleString()
+        };
+
+        try {
+          // Deduct from wallet balance
+          const curBal = parseFloat(localStorage.getItem('safepay_demo_wallet_balance') || '1051033');
+          const newBal = Math.max(0, curBal - amtNum);
+          localStorage.setItem('safepay_demo_wallet_balance', String(newBal));
+
+          // Save transaction
+          const existingTx = JSON.parse(localStorage.getItem('safepay_shared_transactions') || '[]');
+          existingTx.unshift(completedTx);
+          localStorage.setItem('safepay_shared_transactions', JSON.stringify(existingTx));
+
+          window.dispatchEvent(new Event('storage'));
+        } catch {}
+
         setSuccessModal({
           open: true,
           message: `Payment of ₹${amtNum.toLocaleString()} to ${recipientName} completed successfully!`

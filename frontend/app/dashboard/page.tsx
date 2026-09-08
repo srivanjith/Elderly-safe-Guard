@@ -73,31 +73,6 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  const fetchData = async () => {
-    try {
-      const [txRes, gRes] = await Promise.all([
-        api.get('/transactions'),
-        api.get('/guardians')
-      ]);
-
-      if (txRes.data.success) {
-        setTransactions(txRes.data.transactions || []);
-      }
-      if (gRes.data.success) {
-        setGuardians(gRes.data.guardians || []);
-      }
-    } catch (err) {
-      console.error('[Dashboard] Error fetching data:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  // Exact mockup fallback data matching user's new screenshot
   const defaultMockTransactions = [
     {
       _id: 'tx1',
@@ -131,9 +106,56 @@ export default function DashboardPage() {
     }
   ];
 
+  const fetchData = async () => {
+    let apiTxs: any[] = [];
+
+    try {
+      const [txRes, gRes] = await Promise.all([
+        api.get('/transactions'),
+        api.get('/guardians')
+      ]);
+
+      if (txRes.data?.success && txRes.data.transactions?.length > 0) {
+        apiTxs = txRes.data.transactions;
+      }
+      if (gRes.data?.success) {
+        setGuardians(gRes.data.guardians || []);
+      }
+    } catch {
+      // Local shared storage bus
+    } finally {
+      setLoading(false);
+    }
+
+    let sharedTxs: any[] = [];
+    try {
+      sharedTxs = JSON.parse(localStorage.getItem('safepay_shared_transactions') || '[]');
+    } catch {}
+
+    const merged = [...sharedTxs, ...(apiTxs.length > 0 ? apiTxs : defaultMockTransactions)];
+    
+    // De-duplicate by _id
+    const seen = new Set();
+    const unique = merged.filter(t => {
+      if (seen.has(t._id)) return false;
+      seen.add(t._id);
+      return true;
+    });
+
+    setTransactions(unique);
+  };
+
+  useEffect(() => {
+    fetchData();
+
+    const handleStorage = () => fetchData();
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
   const displayTransactions = transactions.length > 0 ? transactions : defaultMockTransactions;
-  const totalProtectedCount = displayTransactions.length || 5;
-  const suspiciousBlockedCount = displayTransactions.filter(t => t.riskLevel === 'HIGH' || t.status === 'CANCELLED' || t.status === 'BLOCKED').length || 3;
+  const totalProtectedCount = displayTransactions.length;
+  const suspiciousBlockedCount = displayTransactions.filter(t => t.riskLevel === 'HIGH' || t.status === 'CANCELLED' || t.status === 'BLOCKED').length;
 
   const filteredTransactions = displayTransactions.filter(tx => 
     (tx.recipientName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||

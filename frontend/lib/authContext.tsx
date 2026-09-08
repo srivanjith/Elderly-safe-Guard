@@ -42,27 +42,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
+    const savedBalanceStr = localStorage.getItem('safepay_demo_wallet_balance');
+    const dynamicBalance = savedBalanceStr ? parseFloat(savedBalanceStr) : 1051033;
+
     try {
       const res = await api.get('/auth/me');
       if (res.data.success && res.data.user) {
-        setUser(res.data.user);
-        // Connect Socket room
+        setUser({
+          ...res.data.user,
+          walletBalance: savedBalanceStr ? dynamicBalance : res.data.user.walletBalance
+        });
         const socket = getSocket();
         socket.emit('join:room', { userId: res.data.user.id, role: res.data.user.role });
         return;
       }
     } catch (err) {
       if (token.startsWith('demo_jwt_token_')) {
-        if (!user) {
-          setUser({
-            id: 'demo_elderly_user',
-            name: 'Grandma Rose',
-            email: 'elderly@safepay.demo',
-            role: 'ELDERLY_USER',
-            walletBalance: 1051033,
-            phone: '+91 98765 43210'
-          });
-        }
+        setUser(prev => ({
+          id: prev?.id || 'demo_elderly_user',
+          name: prev?.name || 'Grandma Rose',
+          email: prev?.email || 'elderly@safepay.demo',
+          role: prev?.role || 'ELDERLY_USER',
+          walletBalance: dynamicBalance,
+          phone: prev?.phone || '+91 98765 43210'
+        }));
         setLoading(false);
         return;
       }
@@ -76,6 +79,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     fetchCurrentUser();
+
+    const handleStorageChange = () => {
+      const savedBalanceStr = localStorage.getItem('safepay_demo_wallet_balance');
+      if (savedBalanceStr) {
+        const bal = parseFloat(savedBalanceStr);
+        setUser(prev => prev ? { ...prev, walletBalance: bal } : prev);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   const login = (token: string, userData: UserProfile) => {

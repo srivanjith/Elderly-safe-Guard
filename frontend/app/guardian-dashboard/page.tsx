@@ -112,6 +112,12 @@ export default function GuardianDashboardPage() {
         const shared = JSON.parse(localStorage.getItem('safepay_shared_fund_requests') || '[]');
         const updated = shared.filter((r: any) => r._id !== reqId);
         localStorage.setItem('safepay_shared_fund_requests', JSON.stringify(updated));
+
+        // Credit wallet balance
+        const curBal = parseFloat(localStorage.getItem('safepay_demo_wallet_balance') || '1051033');
+        const newBal = curBal + amount;
+        localStorage.setItem('safepay_demo_wallet_balance', String(newBal));
+
         window.dispatchEvent(new Event('storage'));
       } catch {}
 
@@ -178,6 +184,33 @@ export default function GuardianDashboardPage() {
       }
     } catch {
       // Local fallback execution
+      try {
+        const sharedHolds = JSON.parse(localStorage.getItem('safepay_shared_pending_holds') || '[]');
+        const updatedHolds = sharedHolds.filter((t: any) => t._id !== txId);
+        localStorage.setItem('safepay_shared_pending_holds', JSON.stringify(updatedHolds));
+
+        // Update transaction status in shared list
+        const sharedTx = JSON.parse(localStorage.getItem('safepay_shared_transactions') || '[]');
+        const updatedTx = sharedTx.map((t: any) => {
+          if (t._id === txId) {
+            return {
+              ...t,
+              status: actionType === 'APPROVE' ? 'COMPLETED' : 'CANCELLED'
+            };
+          }
+          return t;
+        });
+        localStorage.setItem('safepay_shared_transactions', JSON.stringify(updatedTx));
+
+        // If approved, deduct amount from wallet balance
+        if (actionType === 'APPROVE') {
+          const curBal = parseFloat(localStorage.getItem('safepay_demo_wallet_balance') || '1051033');
+          const newBal = Math.max(0, curBal - (tx.amount || 0));
+          localStorage.setItem('safepay_demo_wallet_balance', String(newBal));
+        }
+
+        window.dispatchEvent(new Event('storage'));
+      } catch {}
     } finally {
       setPendingList(prev => prev.filter(t => t._id !== txId));
       setHistoryList(prev => [
