@@ -41,7 +41,16 @@ app.use('/api/transactions', transactionRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/admin', adminRoutes);
 
-// Health Check
+// Root & Health Check
+app.get('/', (req, res) => {
+  res.json({
+    status: 'online',
+    service: 'SafePay Guardian Backend API',
+    database: isDbConnected() ? 'connected' : 'offline (in-memory demo mode)',
+    timestamp: new Date()
+  });
+});
+
 app.get('/health', (req, res) => {
   res.json({
     status: 'online',
