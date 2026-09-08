@@ -14,6 +14,8 @@ export default function SendMoneyPage() {
   const [recipientId, setRecipientId] = useState('medplus@safepay');
   const [amount, setAmount] = useState<string>('5000');
   const [note, setNote] = useState('');
+  const [senderName, setSenderName] = useState('');
+  const [senderPhone, setSenderPhone] = useState('');
   const [beneficiaryStatus, setBeneficiaryStatus] = useState<'KNOWN' | 'NEW'>('KNOWN');
   const [transactionType, setTransactionType] = useState('Bill payment');
   const [transactionTime, setTransactionTime] = useState('10:30 AM');
@@ -23,6 +25,17 @@ export default function SendMoneyPage() {
   const [evaluating, setEvaluating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  // Prefill sender details from authenticated user
+  useEffect(() => {
+    if (user) {
+      if (!senderName) setSenderName(user.name || 'Senior Account Holder');
+      if (!senderPhone) setSenderPhone(user.phone || '+91 98765 43210');
+    } else {
+      if (!senderName) setSenderName('Senior Account Holder');
+      if (!senderPhone) setSenderPhone('+91 98765 43210');
+    }
+  }, [user]);
 
   // Transaction Outcome Modal States
   const [holdModal, setHoldModal] = useState<{ open: boolean; transaction: any }>({ open: false, transaction: null });
@@ -115,8 +128,8 @@ export default function SendMoneyPage() {
     setError('');
     const amtNum = parseFloat(amount);
 
-    if (!recipientName || !recipientId || !amtNum || amtNum <= 0) {
-      setError('Please fill in all recipient details and a valid amount.');
+    if (!recipientName || !recipientId || !senderName || !senderPhone || !amtNum || amtNum <= 0) {
+      setError('Please fill in all sender details, beneficiary details, and a valid amount.');
       return;
     }
 
@@ -131,6 +144,8 @@ export default function SendMoneyPage() {
       const res = await api.post('/transactions', {
         recipientName,
         recipientId,
+        senderName,
+        senderPhone,
         amount: amtNum,
         note: note ? `[${transactionType}] ${note}` : `[${transactionType}] Payment`,
         deviceChanged: deviceChanged || beneficiaryStatus === 'NEW'
@@ -305,6 +320,45 @@ export default function SendMoneyPage() {
                   placeholder="What is this for?"
                   className="w-full px-4 py-3 bg-[#f8fafc] border border-slate-200 rounded-2xl text-slate-900 font-medium text-sm focus:outline-none focus:border-[#2a276e] transition-all placeholder:text-slate-400"
                 />
+              </div>
+
+              {/* Sender Account Details Section */}
+              <div className="md:col-span-2 pt-4 border-t border-slate-100 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+                    Sender account details
+                  </h3>
+                  <span className="text-[11px] font-medium text-slate-400">
+                    Verified Account Holder
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Sender Account Name */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-2">Sender account name</label>
+                    <input
+                      type="text"
+                      required
+                      value={senderName}
+                      onChange={(e) => setSenderName(e.target.value)}
+                      placeholder="Enter sender account name"
+                      className="w-full px-4 py-3 bg-[#f8fafc] border border-slate-200 rounded-2xl text-slate-900 font-bold text-base focus:outline-none focus:border-[#2a276e] transition-all placeholder:text-slate-400"
+                    />
+                  </div>
+
+                  {/* Sender Phone Number */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-2">Sender phone number</label>
+                    <input
+                      type="text"
+                      required
+                      value={senderPhone}
+                      onChange={(e) => setSenderPhone(e.target.value)}
+                      placeholder="+91 98765 43210"
+                      className="w-full px-4 py-3 bg-[#f8fafc] border border-slate-200 rounded-2xl text-slate-900 font-bold text-base focus:outline-none focus:border-[#2a276e] transition-all placeholder:text-slate-400"
+                    />
+                  </div>
+                </div>
               </div>
 
             </div>
