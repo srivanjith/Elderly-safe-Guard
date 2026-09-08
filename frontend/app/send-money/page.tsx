@@ -197,23 +197,24 @@ export default function SendMoneyPage() {
                   <button
                     type="button"
                     onClick={async () => {
-                      const amtStr = prompt('Enter amount to add to wallet (₹):', '50000');
+                      const amtStr = prompt('Enter Allowance Amount to request from Guardian (₹):', '10000');
                       if (!amtStr) return;
                       const amt = parseFloat(amtStr);
                       if (!amt || amt <= 0) return;
+                      const note = prompt('Enter Purpose / Note (Optional):', 'Monthly Expenses') || 'Allowance';
                       try {
-                        const res = await api.post('/users/topup', { amount: amt });
+                        const res = await api.post('/users/request-funds', { amount: amt, note });
                         if (res.data.success) {
-                          alert(res.data.message || `₹${amt.toLocaleString()} added to your wallet!`);
+                          alert(res.data.message || `📩 Fund request for ₹${amt.toLocaleString()} sent to Guardian!`);
                           if (refreshUser) refreshUser();
                         }
                       } catch (err: any) {
-                        alert('Top up failed');
+                        alert('Request failed');
                       }
                     }}
-                    className="px-2 py-0.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] shadow-sm transition-all"
+                    className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] shadow-sm transition-all"
                   >
-                    + Add Funds
+                    + Request Funds
                   </button>
                 </div>
               </div>

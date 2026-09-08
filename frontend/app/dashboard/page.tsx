@@ -34,19 +34,21 @@ export default function DashboardPage() {
   const { user, refreshUser } = useAuth();
 
   const handleTopup = async () => {
-    const amountStr = prompt('Enter amount to add to your wallet (₹):', '50000');
+    const amountStr = prompt('Enter Allowance Amount to request from your Guardian (₹):', '10000');
     if (!amountStr) return;
     const amt = parseFloat(amountStr);
     if (!amt || amt <= 0) return;
 
+    const note = prompt('Enter Purpose / Reason (Optional):', 'Monthly Medical & Grocery Expenses') || 'Monthly Allowance';
+
     try {
-      const res = await api.post('/users/topup', { amount: amt });
+      const res = await api.post('/users/request-funds', { amount: amt, note });
       if (res.data.success) {
-        alert(res.data.message || `₹${amt.toLocaleString()} added to your wallet!`);
+        alert(res.data.message || `📩 Fund request for ₹${amt.toLocaleString()} sent to your Guardian for review.`);
         if (refreshUser) refreshUser();
       }
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Top-up failed');
+      alert(err.response?.data?.message || 'Request failed');
     }
   };
   const [transactions, setTransactions] = useState<any[]>([]);

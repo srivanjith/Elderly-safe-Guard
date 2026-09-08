@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { ShieldAlert, CheckCircle, XCircle, History } from 'lucide-react';
+import { ShieldAlert, CheckCircle, XCircle, History, Wallet, Send, ArrowRight } from 'lucide-react';
 import api from '../../lib/api';
 import { RiskBadge } from '../../components/RiskBadge';
 import { getSocket } from '../../lib/socket';
 
 export default function GuardianDashboardPage() {
   const [pendingList, setPendingList] = useState<any[]>([]);
+  const [fundRequests, setFundRequests] = useState<any[]>([]);
   const [historyList, setHistoryList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -22,9 +23,10 @@ export default function GuardianDashboardPage() {
 
   const fetchPendingAndHistory = async () => {
     try {
-      const [pendingRes, historyRes] = await Promise.all([
+      const [pendingRes, historyRes, fundRes] = await Promise.all([
         api.get('/transactions/guardian/pending'),
-        api.get('/transactions')
+        api.get('/transactions'),
+        api.get('/users/fund-requests/pending')
       ]);
 
       if (pendingRes.data.success) {
@@ -34,10 +36,38 @@ export default function GuardianDashboardPage() {
       if (historyRes.data.success) {
         setHistoryList(historyRes.data.transactions || []);
       }
+
+      if (fundRes.data.success) {
+        setFundRequests(fundRes.data.fundRequests || []);
+      }
     } catch (err) {
       console.error('[GuardianDashboard] Fetch error:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleApproveFundRequest = async (reqId: string, amount: number, requesterName: string) => {
+    setProcessing(true);
+    try {
+      const res = await api.post(`/users/fund-requests/${reqId}/approve`);
+      if (res.data.success) {
+        alert(res.data.message || `✅ ₹${amount.toLocaleString()} allowance transferred to ${requesterName} successfully!`);
+        fetchPendingAndHistory();
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Transfer failed');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleRejectFundRequest = async (reqId: string) => {
+    try {
+      await api.post(`/users/fund-requests/${reqId}/reject`);
+      fetchPendingAndHistory();
+    } catch (err: any) {
+      alert('Failed to decline request');
     }
   };
 
@@ -47,15 +77,18 @@ export default function GuardianDashboardPage() {
     const socket = getSocket();
     const handleHighRisk = () => fetchPendingAndHistory();
     const handleStatus = () => fetchPendingAndHistory();
+    const handleFundRequested = () => fetchPendingAndHistory();
 
     socket.on('transaction:high-risk', handleHighRisk);
     socket.on('transaction:approved', handleStatus);
     socket.on('transaction:blocked', handleStatus);
+    socket.on('fund:requested', handleFundRequested);
 
     return () => {
       socket.off('transaction:high-risk', handleHighRisk);
       socket.off('transaction:approved', handleStatus);
       socket.off('transaction:blocked', handleStatus);
+      socket.off('fund:requested', handleFundRequested);
     };
   }, []);
 
@@ -118,6 +151,72 @@ export default function GuardianDashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Ward Allowance & Fund Requests Queue */}
+      {fundRequests.length > 0 && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3">
+              <Wallet className="w-7 h-7 text-emerald-600" />
+              <span>Ward Allowance & Fund Requests ({fundRequests.length})</span>
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6">
+            {fundRequests.map((req) => (
+              <div
+                key={req._id}
+                className="p-8 rounded-3xl bg-white border-2 border-emerald-300 shadow-md space-y-6 relative overflow-hidden"
+              >
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center justify-center font-black text-xl">
+                      💰
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-black text-slate-900 text-xl">{req.requesterId?.name || 'Ramakrishna Sharma'}</span>
+                        <span className="text-xs font-semibold text-slate-500">requested wallet allowance</span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5 font-medium">
+                        Requested: {new Date(req.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <span className="text-3xl font-black text-emerald-600">₹{req.amount?.toLocaleString()}</span>
+                    <span className="block text-xs font-black text-slate-500 uppercase tracking-wider">Allowance Request</span>
+                  </div>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
+                  <span className="text-xs font-black text-slate-500 uppercase tracking-wider block">Purpose / Expense Note</span>
+                  <p className="text-sm text-slate-800 font-bold italic">&quot;{req.note || 'Monthly Allowance'}&quot;</p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center justify-end gap-4 pt-4 border-t border-slate-100">
+                  <button
+                    onClick={() => handleRejectFundRequest(req._id)}
+                    className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-sm transition-all border border-slate-200"
+                  >
+                    Decline Request
+                  </button>
+
+                  <button
+                    onClick={() => handleApproveFundRequest(req._id, req.amount, req.requesterId?.name || 'ward')}
+                    disabled={processing}
+                    className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-base shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 transition-all hover:scale-105"
+                  >
+                    <Send className="w-5 h-5 text-white" />
+                    <span>TRANSFER ₹{req.amount?.toLocaleString()} TO ELDERLY ACCOUNT</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Pending Approval Cards Queue */}
       <div className="space-y-6">
