@@ -1,0 +1,12 @@
+{
+  "name": "safepay-guardian-monorepo",
+  "version": "1.0.0",
+  "description": "SafePay Guardian - AI-Powered Payment Fraud Protection Platform",
+  "private": true,
+  "scripts": {
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:ml": "cd ml-service && uvicorn app.main:app --reload --port 8000",
+    "seed": "cd backend && npm run seed"
+  }
+}
