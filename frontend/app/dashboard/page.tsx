@@ -506,16 +506,6 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Manage Guardians Button */}
-              <Link
-                href="/guardians"
-                className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all group shadow-md"
-              >
-                <Plus className="w-4 h-4 text-white group-hover:rotate-90 transition-transform duration-300" />
-                <span>Manage Family Guardians</span>
-                <ArrowRight className="w-4 h-4 text-white group-hover:translate-x-1 transition-transform" />
-              </Link>
-
             </div>
 
           </div>
