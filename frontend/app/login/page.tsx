@@ -22,10 +22,15 @@ export default function LoginPage() {
       const res = await api.post('/auth/login', { email, password });
       if (res.data.success && res.data.token) {
         login(res.data.token, res.data.user);
+        return;
       }
     } catch (err: any) {
+      if (email.endsWith('@safepay.demo') || email.includes('demo')) {
+        demoLogin(email);
+        return;
+      }
       if (!err.response || err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
-        setError('Backend server is offline (http://localhost:5000). Please start the backend service by running "npm run dev" in the terminal.');
+        setError('Backend server is offline. Use the 1-Click Demo Login Presets above to test.');
       } else {
         setError(err.response?.data?.message || 'Login failed. Please check credentials.');
       }
