@@ -14,7 +14,7 @@ export default function SendMoneyPage() {
   const [recipientId, setRecipientId] = useState('medplus@safepay');
   const [amount, setAmount] = useState<string>('5000');
   const [note, setNote] = useState('');
-  const [senderEmail, setSenderEmail] = useState('');
+  const [senderUpiId, setSenderUpiId] = useState('');
   const [senderPhone, setSenderPhone] = useState('');
   const [beneficiaryStatus, setBeneficiaryStatus] = useState<'KNOWN' | 'NEW'>('KNOWN');
   const [transactionType, setTransactionType] = useState('Bill payment');
@@ -29,10 +29,10 @@ export default function SendMoneyPage() {
   // Prefill sender details from authenticated user
   useEffect(() => {
     if (user) {
-      if (!senderEmail) setSenderEmail(user.email || 'sri@example.com');
+      if (!senderUpiId) setSenderUpiId((user as any).upiId || user.email || 'elderly@safepay.demo');
       if (!senderPhone) setSenderPhone(user.phone || '+91 98765 43210');
     } else {
-      if (!senderEmail) setSenderEmail('sri@example.com');
+      if (!senderUpiId) setSenderUpiId('elderly@safepay.demo');
       if (!senderPhone) setSenderPhone('+91 98765 43210');
     }
   }, [user]);
@@ -161,7 +161,7 @@ export default function SendMoneyPage() {
     setError('');
     const amtNum = parseFloat(amount);
 
-    if (!recipientName || !recipientId || !senderEmail || !senderPhone || !amtNum || amtNum <= 0) {
+    if (!recipientName || !recipientId || !senderUpiId || !senderPhone || !amtNum || amtNum <= 0) {
       setError('Please fill in all sender details, beneficiary details, and a valid amount.');
       return;
     }
@@ -177,7 +177,8 @@ export default function SendMoneyPage() {
       const res = await api.post('/transactions', {
         recipientName,
         recipientId,
-        senderEmail,
+        senderUpiId,
+        senderEmail: senderUpiId,
         senderPhone,
         amount: amtNum,
         note: note ? `[${transactionType}] ${note}` : `[${transactionType}] Payment`,
@@ -431,15 +432,15 @@ export default function SendMoneyPage() {
                   </span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Sender Account Email */}
+                  {/* Sender Account UPI ID */}
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-2">Sender account email</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-2">Sender UPI ID</label>
                     <input
-                      type="email"
+                      type="text"
                       required
-                      value={senderEmail}
-                      onChange={(e) => setSenderEmail(e.target.value)}
-                      placeholder="sri@example.com"
+                      value={senderUpiId}
+                      onChange={(e) => setSenderUpiId(e.target.value)}
+                      placeholder="elderly@safepay.demo"
                       className="w-full px-4 py-3 bg-[#f8fafc] border border-slate-200 rounded-2xl text-slate-900 font-bold text-base focus:outline-none focus:border-[#2a276e] transition-all placeholder:text-slate-400"
                     />
                   </div>
